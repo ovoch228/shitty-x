@@ -1,0 +1,208 @@
+local replicatedstorage = game:GetService("ReplicatedStorage")
+local bytenet = require(replicatedstorage:WaitForChild("Teawork"):WaitForChild("Shared"):WaitForChild("Services"):WaitForChild("ByteNetworking"))
+
+local api = {}
+
+function api:Map(map: string)
+	if game.PlaceId ~= 98936097545088 then return end
+	
+	bytenet.MatchmakingNew.CreateSingleplayer.invoke({["Gamemode"] = "Standard", ["MapID"] = map})
+end
+
+if game.PlaceId ~= 124069847780670 then return api end
+
+local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/ovoch228/depthsoimgui/refs/heads/main/library'))()
+
+local towers = bytenet.Towers
+local mapinfo = replicatedstorage.RoundInfo
+
+local ostime = os.time
+
+getgenv().StratName = "Strat"
+
+getgenv().timer = 0 -- seconds
+getgenv().lasttime = ostime()
+getgenv().waveinfo = mapinfo:GetAttribute("Wave")
+getgenv().roundend = false
+
+getgenv().totalplacedtowers = 0
+getgenv().firsttower = 1
+
+getgenv().destroyui = false
+
+local window = library:CreateWindow({
+    Title = "Shitty X",
+    Size = UDim2.new(0, 350, 0, 370),
+    Position = UDim2.new(0.5, 0, 0, 70),
+    NoResize = false
+})
+
+window:Center()
+
+local logtab = window:CreateTab({
+    Name = "Macro Player",
+    Visible = true
+})
+
+local filename = logtab:Label({
+    Text = "StratName: " .. getgenv().StratName
+})
+
+local logstab = window:CreateTab({
+    Name = "Logs",
+    Visible = true
+})
+
+local loglabel = logtab:Label({
+    Label = "Last Log: Voting"
+})
+
+local row = logstab:Row()
+
+logstab:Separator({
+	Text = "Logs:"
+})
+
+local logs = logstab:Console({
+	Text = "",
+	ReadOnly = true,
+	LineNumbers = false,
+	Border = false,
+	Fill = true,
+	Enabled = true,
+	AutoScroll = true,
+	RichText = true,
+	MaxLines = 200
+})
+
+function updatelog(text: string)
+	setthreadidentity(7)
+	logs:AppendText(DateTime.now():FormatLocalTime("HH:mm:ss", "en-us") .. ":", text)
+	loglabel:SetText("Last Log: " .. text)
+end
+
+window:ShowTab(logtab)
+updatelog("Voting")
+
+function waitTime(time, wave)
+	while waveinfo < wave and timer < time do
+		task.wait(0.05)
+	end
+end
+
+function api:Loop(func)
+	if game.PlaceId ~= 124069847780670 then return end 
+	
+	while task.wait(0.03) do				
+		func()
+	end
+end
+
+function api:Start()
+	bytenet.Timescale.SetTimescale.send(2)
+
+	getgenv().waveinfo = mapinfo:GetAttribute("Wave") or 0
+	getgenv().timer = 0
+	
+	mapinfo:GetAttributeChangedSignal("Wave"):Connect(function()
+		getgenv().waveinfo = mapinfo:GetAttribute("Wave")
+	end)
+	
+	updatelog("Game Started")
+		
+	task.spawn(function()
+		lasttime = ostime()
+		while getgenv().lasttime do
+			getgenv().timer = (ostime() - getgenv().lasttime) * 2
+			--print(string.format("Timer: %.1f | Wave: %d", timer, waveinfo or 0))
+			
+			task.wait(0.5)
+		end
+	end)
+end
+
+function api:Difficulty(diff: string)
+	updatelog(`Voted difficulty {diff}`)
+	bytenet.DifficultyVote.Vote.send(diff)
+	
+	while #mapinfo:GetAttribute("Difficulty") == 0 do task.wait(0.05) end 
+	
+	getgenv().lasttime = ostime()
+	getgenv().timer = 0
+	getgenv().waveinfo = 0
+	
+	task.wait(0.1)
+end
+
+function api:Ready(time: number, wave: number)
+	waitTime(time, wave)
+
+	updatelog("Sent ready vote")
+	bytenet.ReadyVote.Vote.send(true)
+end
+
+function api:Skip(time: number, wave: number)
+	waitTime(time, wave)
+
+	updatelog(`Skipping Wave {wave}`)
+	replicatedstorage:WaitForChild("ByteNetReliable"):FireServer(buffer.fromstring("\148\001"))
+end
+
+function api:AutoSkip(enable: number, time: number, wave: number)
+	waitTime(time, wave)
+	
+	updatelog(`AutoSkip set to {tostring(enable)}`)
+	bytenet.SkipWave.ToggleAutoSkip.send(enable)
+end
+
+function api:Place(tower: string, position: Vector3, time: number, wave: number)
+	waitTime(time, wave)	
+	totalplacedtowers = totalplacedtowers + 1
+	
+	updatelog(`Placed Tower {tower}`)
+	local result = towers.PlaceTower.invoke({["Position"] = position, ["Rotation"] = 0, ["TowerID"] = tower})
+	--print("PlaceTower Result:", result)
+end
+
+function api:Upgrade(tower: number, time: number, wave: number)
+	waitTime(time, wave)
+	updatelog(`Upgraded Tower {tower}`)
+	
+	local realindex = firsttower + (tower - 1)
+	towers.UpgradeTower.invoke(realindex)
+end
+
+function api:SetTarget(tower: number, target: string, time: number, wave: number)
+	waitTime(time, wave)
+	updatelog(`Changed Tower {tower} Target to {target} `)
+	
+	local realindex = firsttower + (tower - 1)
+	pcall(function() towers.SetTargetMode.send({["UID"] = (realindex), ["TargetMode"] = target}) end)
+end
+
+function api:Sell(tower: number, time: number, wave: number)
+	waitTime(time, wave)
+	updatelog(`Sold Tower {tower}`) 
+	
+	local realindex = firsttower + (tower - 1)
+	towers.SellTower.invoke(realindex)
+end
+
+function api:PlayAgain()
+	while not game:GetService("Players").LocalPlayer.PlayerGui.GameUI.RoundResult.Visible do task.wait(0.1) end
+	
+	firsttower = totalplacedtowers + 1
+	roundend = false
+	
+	getgenv().lasttime = ostime()
+	getgenv().timer = 0
+	getgenv().waveinfo = 0
+	
+	task.wait(1)
+	
+	bytenet.RoundResult.VoteForRestart.send(true)
+	updatelog("Voted for restart")
+	--print('vote restart success:')
+end
+
+return api
