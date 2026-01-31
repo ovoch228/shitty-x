@@ -1,17 +1,27 @@
 local replicatedstorage = game:GetService("ReplicatedStorage")
+
+local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/ovoch228/depthsoimgui/refs/heads/main/library'))()
+
 local bytenet = require(replicatedstorage:WaitForChild("Teawork"):WaitForChild("Shared"):WaitForChild("Services"):WaitForChild("ByteNetworking"))
 
 local api = {}
 
-function api:Map(map: string)
+function api:Loadout(towers: table)
+	if game.PlaceId ~= 98936097545088 then return end
+
+	for i = 1, #towers do
+		bytenet.Inventory.EquipTower.invoke({["TowerID"] = towers[i], ["Slot"] = i})
+		task.wait(0.1)
+	end
+end
+
+function api:Map(map: string, modifiers: table)
 	if game.PlaceId ~= 98936097545088 then return end
 	
-	bytenet.MatchmakingNew.CreateSingleplayer.invoke({["Gamemode"] = "Standard", ["MapID"] = map})
+	bytenet.MatchmakingNew.CreateSingleplayer.invoke({["Gamemode"] = "Standard", ["MapID"] = map, ["Modifiers"] = modifiers})
 end
 
 if game.PlaceId ~= 124069847780670 then return api end
-
-local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/ovoch228/depthsoimgui/refs/heads/main/library'))()
 
 local towers = bytenet.Towers
 local mapinfo = replicatedstorage.RoundInfo
@@ -22,8 +32,7 @@ getgenv().StratName = "Strat"
 
 getgenv().timer = 0 -- seconds
 getgenv().lasttime = ostime()
-getgenv().waveinfo = mapinfo:GetAttribute("Wave")
-getgenv().roundend = false
+getgenv().waveinfo = 1
 
 getgenv().totalplacedtowers = 0
 getgenv().firsttower = 1
@@ -85,9 +94,13 @@ window:ShowTab(logtab)
 updatelog("Voting")
 
 function waitTime(time, wave)
-	while waveinfo < wave and timer < time do
+	while waveinfo < wave do
 		task.wait(0.05)
 	end
+	    	
+    	while timer < time do
+        	task.wait(0.05)
+    	end
 end
 
 function api:Loop(func)
@@ -101,7 +114,7 @@ end
 function api:Start()
 	bytenet.Timescale.SetTimescale.send(2)
 
-	getgenv().waveinfo = mapinfo:GetAttribute("Wave") or 0
+	getgenv().waveinfo = mapinfo:GetAttribute("Wave") or 1
 	getgenv().timer = 0
 	
 	mapinfo:GetAttributeChangedSignal("Wave"):Connect(function()
@@ -114,9 +127,9 @@ function api:Start()
 		lasttime = ostime()
 		while getgenv().lasttime do
 			getgenv().timer = (ostime() - getgenv().lasttime) * 2
-			--print(string.format("Timer: %.1f | Wave: %d", timer, waveinfo or 0))
+			--print(string.format("Timer: %.1f | Wave: %d", timer, waveinfo))
 			
-			task.wait(0.5)
+			task.wait(0.25)
 		end
 	end)
 end
@@ -129,7 +142,7 @@ function api:Difficulty(diff: string)
 	
 	getgenv().lasttime = ostime()
 	getgenv().timer = 0
-	getgenv().waveinfo = 0
+	getgenv().waveinfo = 1
 	
 	task.wait(0.1)
 end
@@ -192,11 +205,10 @@ function api:PlayAgain()
 	while not game:GetService("Players").LocalPlayer.PlayerGui.GameUI.RoundResult.Visible do task.wait(0.1) end
 	
 	firsttower = totalplacedtowers + 1
-	roundend = false
 	
 	getgenv().lasttime = ostime()
 	getgenv().timer = 0
-	getgenv().waveinfo = 0
+	getgenv().waveinfo = 1
 	
 	task.wait(1)
 	
@@ -206,3 +218,7 @@ function api:PlayAgain()
 end
 
 return api
+
+
+
+
