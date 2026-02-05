@@ -11,7 +11,7 @@ function api:Loadout(towers: table)
 
 	for i = 1, #towers do
 		bytenet.Inventory.EquipTower.invoke({["TowerID"] = towers[i], ["Slot"] = i})
-		task.wait(0.1)
+		task.wait(0.5)
 	end
 end
 
