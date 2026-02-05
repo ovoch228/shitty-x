@@ -26,18 +26,23 @@ if game.PlaceId ~= 124069847780670 then return api end
 local towers = bytenet.Towers
 local mapinfo = replicatedstorage.RoundInfo
 
+local roundresultui = game:GetService("Players").LocalPlayer.PlayerGui.GameUI.RoundResult
+
 local ostime = os.time
+local taskwait = task.wait
+local env = getgenv()
 
-getgenv().StratName = "Strat"
+env.StratName = "Strat"
 
-getgenv().timer = 0 -- seconds
-getgenv().lasttime = ostime()
-getgenv().waveinfo = 1
+env.timer = 0 -- seconds
+env.lasttime = ostime()
+env.waveinfo = 1
+env.isroundover = false
 
-getgenv().totalplacedtowers = 0
-getgenv().firsttower = 1
+env.totalplacedtowers = 0
+env.firsttower = 1
 
-getgenv().destroyui = false
+env.destroyui = false
 
 local window = library:CreateWindow({
     Title = "Shitty X",
@@ -54,7 +59,7 @@ local logtab = window:CreateTab({
 })
 
 local filename = logtab:Label({
-    Text = "StratName: " .. getgenv().StratName
+    Text = "StratName: " .. env.StratName
 })
 
 local logstab = window:CreateTab({
@@ -94,19 +99,21 @@ window:ShowTab(logtab)
 updatelog("Voting")
 
 function waitTime(time, wave)
-	while waveinfo < wave do
-		task.wait(0.05)
+	while waveinfo < wave and not isroundover do
+		taskwait(0.05)
 	end
-	    	
-    	while timer < time do
-        	task.wait(0.05)
+	   
+    	while timer < time and not isroundover do
+        	taskwait(0.05)
     	end
+    	
+    	return not isroundover
 end
 
 function api:Loop(func)
 	if game.PlaceId ~= 124069847780670 then return end 
 	
-	while task.wait(0.03) do				
+	while taskwait(0.03) do				
 		func()
 	end
 end
@@ -114,22 +121,26 @@ end
 function api:Start()
 	bytenet.Timescale.SetTimescale.send(2)
 
-	getgenv().waveinfo = mapinfo:GetAttribute("Wave") or 1
-	getgenv().timer = 0
+	env.waveinfo = mapinfo:GetAttribute("Wave") or 1
+	env.timer = 0
 	
 	mapinfo:GetAttributeChangedSignal("Wave"):Connect(function()
-		getgenv().waveinfo = mapinfo:GetAttribute("Wave")
+		env.waveinfo = mapinfo:GetAttribute("Wave")
+	end)
+
+	roundresultui:GetPropertyChangedSignal("Visible"):Connect(function()
+		isroundover = roundresultui.Visible
 	end)
 	
 	updatelog("Game Started")
 		
 	task.spawn(function()
 		lasttime = ostime()
-		while getgenv().lasttime do
-			getgenv().timer = (ostime() - getgenv().lasttime) * 2
+		while env.lasttime do
+			env.timer = (ostime() - env.lasttime) * 2
 			--print(string.format("Timer: %.1f | Wave: %d", timer, waveinfo))
 			
-			task.wait(0.25)
+			taskwait(0.25)
 		end
 	end)
 end
@@ -138,79 +149,73 @@ function api:Difficulty(diff: string)
 	updatelog(`Voted difficulty {diff}`)
 	bytenet.DifficultyVote.Vote.send(diff)
 	
-	while #mapinfo:GetAttribute("Difficulty") == 0 do task.wait(0.05) end 
+	while #mapinfo:GetAttribute("Difficulty") == 0 do taskwait(0.05) end 
 	
-	getgenv().lasttime = ostime()
-	getgenv().timer = 0
-	getgenv().waveinfo = 1
+	env.lasttime = ostime()
+	env.timer = 0
+	env.waveinfo = 1
 	
-	task.wait(0.1)
+	taskwait(0.1)
 end
 
 function api:Ready(time: number, wave: number)
-	waitTime(time, wave)
-
-	updatelog("Sent ready vote")
-	bytenet.ReadyVote.Vote.send(true)
+	if waitTime(time, wave) then updatelog("Sent ready vote") bytenet.ReadyVote.Vote.send(true) end
 end
 
 function api:Skip(time: number, wave: number)
-	waitTime(time, wave)
-
-	updatelog(`Skipping Wave {wave}`)
-	replicatedstorage:WaitForChild("ByteNetReliable"):FireServer(buffer.fromstring("\148\001"))
+	if waitTime(time, wave) then updatelog(`Skipping Wave {wave}`) replicatedstorage:WaitForChild("ByteNetReliable"):FireServer(buffer.fromstring("\148\001")) end
 end
 
 function api:AutoSkip(enable: number, time: number, wave: number)
-	waitTime(time, wave)
-	
-	updatelog(`AutoSkip set to {tostring(enable)}`)
-	bytenet.SkipWave.ToggleAutoSkip.send(enable)
+	if waitTime(time, wave) then updatelog(`AutoSkip set to {tostring(enable)}`) bytenet.SkipWave.ToggleAutoSkip.send(enable) end
 end
 
 function api:Place(tower: string, position: Vector3, time: number, wave: number)
-	waitTime(time, wave)	
-	totalplacedtowers = totalplacedtowers + 1
-	
-	updatelog(`Placed Tower {tower}`)
-	local result = towers.PlaceTower.invoke({["Position"] = position, ["Rotation"] = 0, ["TowerID"] = tower})
-	--print("PlaceTower Result:", result)
+	if waitTime(time, wave) then	
+		env.totalplacedtowers = env.totalplacedtowers + 1
+		
+		updatelog(`Placed Tower {tower}`)
+		towers.PlaceTower.invoke({["Position"] = position, ["Rotation"] = 0, ["TowerID"] = tower})
+	end
 end
 
 function api:Upgrade(tower: number, time: number, wave: number)
-	waitTime(time, wave)
-	updatelog(`Upgraded Tower {tower}`)
-	
-	local realindex = firsttower + (tower - 1)
-	towers.UpgradeTower.invoke(realindex)
+	if waitTime(time, wave) then
+		updatelog(`Upgraded Tower {tower}`)
+		
+		local realindex = firsttower + (tower - 1)
+		towers.UpgradeTower.invoke(realindex)
+	end
 end
 
 function api:SetTarget(tower: number, target: string, time: number, wave: number)
-	waitTime(time, wave)
-	updatelog(`Changed Tower {tower} Target to {target} `)
+	if waitTime(time, wave) then
+		updatelog(`Changed Tower {tower} Target to {target} `)
 	
-	local realindex = firsttower + (tower - 1)
-	pcall(function() towers.SetTargetMode.send({["UID"] = (realindex), ["TargetMode"] = target}) end)
+		local realindex = firsttower + (tower - 1)
+		towers.SetTargetMode.send({["UID"] = (realindex), ["TargetMode"] = target})
+	end
 end
 
 function api:Sell(tower: number, time: number, wave: number)
-	waitTime(time, wave)
-	updatelog(`Sold Tower {tower}`) 
-	
-	local realindex = firsttower + (tower - 1)
-	towers.SellTower.invoke(realindex)
+	if waitTime(time, wave) then
+		updatelog(`Sold Tower {tower}`) 
+		
+		local realindex = firsttower + (tower - 1)
+		towers.SellTower.invoke(realindex)
+	end
 end
 
 function api:PlayAgain()
-	while not game:GetService("Players").LocalPlayer.PlayerGui.GameUI.RoundResult.Visible do task.wait(0.1) end
+	while not isroundover do taskwait(0.1) end
 	
-	firsttower = totalplacedtowers + 1
+	env.firsttower = env.totalplacedtowers + 1
 	
-	getgenv().lasttime = ostime()
-	getgenv().timer = 0
-	getgenv().waveinfo = 1
+	env.lasttime = ostime()
+	env.timer = 0
+	env.waveinfo = 1
 	
-	task.wait(1)
+	taskwait(1)
 	
 	bytenet.RoundResult.VoteForRestart.send(true)
 	updatelog("Voted for restart")
