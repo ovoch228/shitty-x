@@ -17,6 +17,7 @@ local mapinfo = replicatedstorage.RoundInfo
 
 local ostime = os.time
 local concat = table.concat
+local taskwait = task.wait
 
 local equippedtowers = datamodule:Get().EquippedTowers
 
@@ -91,13 +92,13 @@ local writebutton = filetab:Button({
 })
 
 while not destroyui do
-    task.wait(0.1)
+    taskwait(0.1)
 end
 
 writebutton:Destroy()
 textbox:Destroy()
 
-task.wait(1)
+taskwait(1)
 
 local recordertab = filetab
 local logstab = window:CreateTab({
@@ -138,14 +139,14 @@ window:ShowTab(recordertab)
 updatelog("Voting")
 
 while #mapinfo:GetAttribute("Difficulty") == 0 do
-  	task.wait(0.05)
+  	taskwait(0.05)
 end 
 
 local lasttime = ostime()
 task.spawn(function()
 	while true do
 		timer = (ostime() - lasttime) * 2
-		task.wait(0.25)
+		taskwait(0.25)
 	end	
 end)
 
@@ -160,61 +161,65 @@ end)
 -- Main Record Macros
 bytenet.RoundResult.Show.listen(function() -- end screen
 	updatelog("Macro Recorded!")
-	--hooks = {}
 	
 	appendfile(getgenv().StratName..".txt", `\t api:PlayAgain() \n end)`)
 end)
 
 hooks["ready"] = hookfunction(bytenet.ReadyVote.Vote.send, function(value)
-	updatelog("Sent ready vote")
+	if checkcaller() then return hooks["ready"](value) end
 
+	updatelog("Sent ready vote")
 	appendfile(getgenv().StratName..".txt", `\t api:Ready({timer}, {wave})\n`)	
 	return hooks["ready"](value)
 end)
 
 hooks["skip"] = hookfunction(bytenet.SkipWave.Vote.send, function(value)
-	updatelog("Skipped Wave " .. wave)
+	if checkcaller() then return hooks["skip"](value) end
 
+	updatelog("Skipped Wave " .. wave)
 	appendfile(getgenv().StratName..".txt", `\t api:Skip({timer}, {wave})\n`)
 	return hooks["skip"](value)
 end)
 
 hooks["autoskip"] = hookfunction(bytenet.SkipWave.ToggleAutoSkip.send, function(value)
-	updatelog("AutoSkip set to: " .. tostring(value))
+	if checkcaller() then return hooks["autoskip"](value) end
 
+	updatelog("AutoSkip set to: " .. tostring(value))
 	appendfile(getgenv().StratName..".txt", `\t api:AutoSkip({value}, {timer}, {wave})\n`)
 	return hooks["autoskip"](value)
 end)
 
-hooks["place"] = hookfunction(towers.PlaceTower.invoke, newcclosure(function(towerdata)	
-	updatelog(`Placed Tower {towerdata.TowerID}`)
+hooks["place"] = hookfunction(towers.PlaceTower.invoke, function(towerdata)	
+	if checkcaller() then return hooks["place"](towerdata) end
 
+	updatelog(`Placed Tower {towerdata.TowerID}`)
 	appendfile(getgenv().StratName..".txt", `\t api:Place('{towerdata.TowerID}', Vector3.new({towerdata.Position}), {timer}, {wave})\n`)
-	print("tower placed:", towerdata.TowerID, "pos:", towerdata.Position, Vector3.new(towerdata.Position), "time:", timer)
 	return hooks["place"](towerdata)
-end))
+end)
 
 hooks["upgrade"] = hookfunction(towers.UpgradeTower.invoke, function(index)
+	if checkcaller() then return hooks["upgrade"](index) end
+
 	updatelog("Upgraded Tower " .. index)
-	
 	appendfile(getgenv().StratName..".txt", `\t api:Upgrade({index}, {timer}, {wave})\n`)
-	print("tower upgrade:", index, typeof(index), "time", timer)
 	return hooks["upgrade"](index)
 end)
 
 hooks["target"] = hookfunction(towers.SetTargetMode.send, function(towerdata)
+	if checkcaller() then return hooks["target"](towerdata) end
+
 	updatelog(`Changed Tower {towerdata.UID} Target to {towerdata.TargetMode} `)
-	
 	appendfile(getgenv().StratName..".txt", `\t api:SetTarget({towerdata.UID}, '{towerdata.TargetMode}', {timer}, {wave}) \n`)
-	print("tower target:", towerdata.TargetMode, towerdata.UID, "time", timer)
 	return hooks["target"](towerdata)
 end)
 
 hooks["sell"] = hookfunction(towers.SellTower.invoke, function(index)
-	updatelog("Sold Tower " .. index)
+	if checkcaller() then return hooks["sell"](index) end
 
+	updatelog("Sold Tower " .. index)
 	appendfile(getgenv().StratName..".txt", `\t api:Sell({index}, {timer}, {wave}) \n`)
-	print("tower sold:", index, typeof(index))
 	return hooks["sell"](index)
 end)
+
+
 
