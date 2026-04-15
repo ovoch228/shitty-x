@@ -129,7 +129,7 @@ function api:Start()
 	end)
 
 	roundresultui:GetPropertyChangedSignal("Visible"):Connect(function()
-		isroundover = roundresultui.Visible
+		env.isroundover = roundresultui.Visible
 	end)
 	
 	updatelog("Game Started")
@@ -170,12 +170,12 @@ function api:AutoSkip(enable: number, time: number, wave: number)
 	if waitTime(time, wave) then updatelog(`AutoSkip set to {tostring(enable)}`) bytenet.SkipWave.ToggleAutoSkip.send(enable) end
 end
 
-function api:Place(tower: string, position: Vector3, time: number, wave: number)
+function api:Place(tower: string, position: Vector3, upvector: Vector3, time: number, wave: number)
 	if waitTime(time, wave) then	
 		env.totalplacedtowers = env.totalplacedtowers + 1
 		
 		updatelog(`Placed Tower {tower}`)
-		towers.PlaceTower.invoke({["Position"] = position, ["Rotation"] = 0, ["TowerID"] = tower})
+		towers.PlaceTower.invoke({["Position"] = position, ["UpVector"] = upvector, ["Rotation"] = 0, ["TowerID"] = tower})
 	end
 end
 
