@@ -29,7 +29,6 @@ local mapinfo = replicatedstorage.RoundInfo
 local roundresultui = game:GetService("Players").LocalPlayer.PlayerGui.GameUI.RoundResult
 
 local ostime = os.time
-local taskwait = task.wait
 local env = getgenv()
 
 env.StratName = "Strat"
@@ -100,11 +99,11 @@ updatelog("Voting")
 
 function waitTime(time, wave)
 	while waveinfo < wave and not isroundover do
-		taskwait(0.05)
+		task.wait(0.05)
 	end
 	   
     	while timer < time and not isroundover do
-        	taskwait(0.05)
+        	task.wait(0.05)
     	end
     	
     	return not isroundover
@@ -113,7 +112,7 @@ end
 function api:Loop(func)
 	if game.PlaceId ~= 124069847780670 then return end 
 	
-	while taskwait(0.03) do				
+	while task.wait(0.03) do				
 		func()
 	end
 end
@@ -140,7 +139,7 @@ function api:Start()
 			env.timer = (ostime() - env.lasttime) * 2
 			--print(string.format("Timer: %.1f | Wave: %d", timer, waveinfo))
 			
-			taskwait(0.25)
+			task.wait(0.25)
 		end
 	end)
 end
@@ -149,13 +148,13 @@ function api:Difficulty(diff: string)
 	updatelog(`Voted difficulty {diff}`)
 	bytenet.DifficultyVote.Vote.send(diff)
 	
-	while #mapinfo:GetAttribute("Difficulty") == 0 do taskwait(0.05) end 
+	while #mapinfo:GetAttribute("Difficulty") == 0 do task.wait(0.05) end 
 	
 	env.lasttime = ostime()
 	env.timer = 0
 	env.waveinfo = 1
 	
-	taskwait(0.1)
+	task.wait(0.1)
 end
 
 function api:Ready(time: number, wave: number)
@@ -207,7 +206,7 @@ function api:Sell(tower: number, time: number, wave: number)
 end
 
 function api:PlayAgain()
-	while not isroundover do taskwait(0.1) end
+	while not isroundover do task.wait(0.1) end
 	
 	env.firsttower = env.totalplacedtowers + 1
 	
@@ -215,7 +214,7 @@ function api:PlayAgain()
 	env.timer = 0
 	env.waveinfo = 1
 	
-	taskwait(1)
+	task.wait(1)
 	
 	bytenet.RoundResult.VoteForRestart.send(true)
 	updatelog("Voted for restart")
